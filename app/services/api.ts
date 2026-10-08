@@ -22,6 +22,7 @@ import type {
   TaskResponse,
   TaskUpdateData,
 } from "../types/task";
+import type { DashboardSummary } from "../types/dashboard";
 
 export const api = createApi({
   reducerPath: "api",
@@ -39,7 +40,7 @@ export const api = createApi({
     },
   }),
 
-  tagTypes: ["Project", "User", "KanbanStage", "Task"],
+  tagTypes: ["Project", "User", "KanbanStage", "Task", "Dashboard"],
 
   endpoints: (builder) => ({
     register: builder.mutation<RegisterResponse, RegisterForm>({
@@ -55,6 +56,10 @@ export const api = createApi({
         method: "POST",
         body: credentials,
       }),
+    }),
+    getDashboard: builder.query<DashboardSummary, void>({
+      query: () => "/Dashboard",
+      providesTags: [{ type: "Dashboard", id: "SUMMARY" }],
     }),
     getUsers: builder.query<User[], void>({
       query: () => "/User",
@@ -106,7 +111,10 @@ export const api = createApi({
         method: "POST",
         body: project,
       }),
-      invalidatesTags: [{ type: "Project", id: "LIST" }],
+      invalidatesTags: [
+        { type: "Project", id: "LIST" },
+        { type: "Dashboard", id: "SUMMARY" },
+      ],
     }),
     updateProject: builder.mutation<
       ProjectResponse,
@@ -120,6 +128,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, { id }) => [
         { type: "Project", id },
         { type: "Project", id: "LIST" },
+        { type: "Dashboard", id: "SUMMARY" },
       ],
     }),
     deleteProject: builder.mutation<{ message: string }, number>({
@@ -130,6 +139,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, id) => [
         { type: "Project", id },
         { type: "Project", id: "LIST" },
+        { type: "Dashboard", id: "SUMMARY" },
       ],
     }),
     getProjectStages: builder.query<KanbanStage[], number>({
@@ -161,6 +171,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, { projectId }) => [
         { type: "KanbanStage", id: projectId },
         { type: "Task", id: `PROJECT-${projectId}` },
+        { type: "Dashboard", id: "SUMMARY" },
       ],
     }),
     updateTask: builder.mutation<
@@ -175,6 +186,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, { projectId }) => [
         { type: "KanbanStage", id: projectId },
         { type: "Task", id: `PROJECT-${projectId}` },
+        { type: "Dashboard", id: "SUMMARY" },
       ],
     }),
     moveTask: builder.mutation<
@@ -189,6 +201,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, { projectId }) => [
         { type: "KanbanStage", id: projectId },
         { type: "Task", id: `PROJECT-${projectId}` },
+        { type: "Dashboard", id: "SUMMARY" },
       ],
     }),
     deleteTask: builder.mutation<
@@ -202,6 +215,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, { projectId }) => [
         { type: "KanbanStage", id: projectId },
         { type: "Task", id: `PROJECT-${projectId}` },
+        { type: "Dashboard", id: "SUMMARY" },
       ],
     }),
   }),
@@ -210,6 +224,7 @@ export const api = createApi({
 export const {
   useRegisterMutation,
   useLoginMutation,
+  useGetDashboardQuery,
   useGetUsersQuery,
   useGetAssigneesQuery,
   useUpdateUserRoleMutation,

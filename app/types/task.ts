@@ -45,3 +45,10 @@ export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [
   { value: 3, label: "High" },
   { value: 4, label: "Critical" },
 ];
+
+export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
+  { value: 1, label: "Todo" },
+  { value: 2, label: "In Progress" },
+  { value: 3, label: "Done" },
+  { value: 4, label: "Blocked" },
+];
