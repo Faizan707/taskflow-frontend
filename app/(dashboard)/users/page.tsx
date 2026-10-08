@@ -11,6 +11,12 @@ import { decodeToken } from "../../utils/jwt";
 
 const roles: UserRole[] = ["User", "Manager", "Admin"];
 
+const roleStyles: Record<string, string> = {
+  Admin: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  Manager: "border-sky-200 bg-sky-50 text-sky-700",
+  User: "border-slate-200 bg-slate-50 text-slate-700",
+};
+
 export default function UsersPage() {
   const router = useRouter();
   const token = useSelector((state: RootState) => state.auth.token);
@@ -62,20 +68,33 @@ export default function UsersPage() {
       header: "Role",
       cell: (user) =>
         user.id === currentUserId ? (
-          <span className="font-medium">{user.role}</span>
-        ) : (
-          <select
-            value={user.role}
-            disabled={updatingUserId === user.id}
-            onChange={(event) => handleRoleChange(user, event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20 disabled:opacity-60"
+          <span
+            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
+              roleStyles[user.role] ?? roleStyles.User
+            }`}
           >
-            {roles.map((roleOption) => (
-              <option key={roleOption} value={roleOption}>
-                {roleOption}
-              </option>
-            ))}
-          </select>
+            {user.role}
+          </span>
+        ) : (
+          <div className="relative inline-flex min-w-32">
+            <select
+              value={user.role}
+              disabled={updatingUserId === user.id}
+              onChange={(event) => handleRoleChange(user, event.target.value)}
+              className={`w-full appearance-none rounded-full border py-1.5 pl-3 pr-8 text-xs font-semibold outline-none transition focus:ring-2 focus:ring-(--primary)/20 disabled:cursor-wait disabled:opacity-60 ${
+                roleStyles[user.role] ?? roleStyles.User
+              }`}
+            >
+              {roles.map((roleOption) => (
+                <option key={roleOption} value={roleOption}>
+                  {roleOption}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-current opacity-60">
+              ▾
+            </span>
+          </div>
         ),
     },
     {

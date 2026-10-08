@@ -17,6 +17,7 @@ interface DataTableProps<T> {
   loadingText?: string;
   emptyTitle?: string;
   emptyMessage?: string;
+  onRowClick?: (row: T) => void;
 }
 
 export default function DataTable<T>({
@@ -27,6 +28,7 @@ export default function DataTable<T>({
   loadingText = "Loading...",
   emptyTitle = "No data found",
   emptyMessage = "There is nothing to show yet.",
+  onRowClick,
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
@@ -62,7 +64,15 @@ export default function DataTable<T>({
         </thead>
         <tbody className="divide-y divide-gray-100">
           {data.map((row) => (
-            <tr key={getRowKey(row)} className="text-(--text-primary)">
+            <tr
+              key={getRowKey(row)}
+              onClick={() => onRowClick?.(row)}
+              className={`text-(--text-primary) ${
+                onRowClick
+                  ? "cursor-pointer transition hover:bg-gray-50"
+                  : ""
+              }`}
+            >
               {columns.map((column) => (
                 <td
                   key={column.header}

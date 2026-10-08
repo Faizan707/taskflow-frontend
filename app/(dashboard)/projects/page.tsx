@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import DataTable, { type Column } from "../../components/DataTable";
 import {
@@ -11,13 +12,19 @@ import {
 } from "../../services/api";
 import type { RootState } from "../../store/store";
 import type { Project } from "../../types/project";
+import { decodeToken } from "../../utils/jwt";
 
 const emptyProject = { name: "", description: "" };
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const token = useSelector((state: RootState) => state.auth.token);
-  const { data: projects = [], isLoading, error } = useGetProjectsQuery(undefined, {
-    skip: !token,
+  const currentUser = token ? decodeToken(token) : null;
+  const role = currentUser?.role ?? null;
+  const userId = currentUser?.userId ?? "";
+  const canSeeAllProjects = role === "Admin" || role === "Manager";
+  const { data: projects = [], isLoading, error } = useGetProjectsQuery(userId, {
+    skip: !token || !userId,
   });
   const [createProject, { isLoading: isCreating }] = useCreateProjectMutation();
   const [updateProject, { isLoading: isUpdating }] = useUpdateProjectMutation();
@@ -78,6 +85,11 @@ export default function ProjectsPage() {
       cell: (project) => <span className="font-medium">{project.name}</span>,
     },
     {
+      header: "Created By",
+      className: "whitespace-nowrap text-(--text-secondary)",
+      cell: (project) => project.createdBy || "—",
+    },
+    {
       header: "Description",
       className: "max-w-100 truncate text-(--text-secondary)",
       cell: (project) => project.description || "—",
@@ -95,14 +107,20 @@ export default function ProjectsPage() {
         <>
           <button
             type="button"
-            onClick={() => handleEdit(project)}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleEdit(project);
+            }}
             className="mr-3 font-medium text-(--primary) hover:underline"
           >
             Edit
           </button>
           <button
             type="button"
-            onClick={() => handleDelete(project)}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDelete(project);
+            }}
             disabled={isDeleting}
             className="font-medium text-red-600 hover:underline disabled:opacity-50"
           >
@@ -119,7 +137,9 @@ export default function ProjectsPage() {
         <div>
           <h1 className="text-2xl font-bold text-(--text-primary)">Projects</h1>
           <p className="mt-2 text-sm text-(--text-secondary)">
-            Create and manage your projects from here.
+            {canSeeAllProjects
+              ? "Showing all projects from every user."
+              : "Showing only projects you created."}
           </p>
         </div>
         <button
@@ -155,6 +175,7 @@ export default function ProjectsPage() {
             loadingText="Loading projects..."
             emptyTitle="No projects yet"
             emptyMessage="Create your first project using the Add Project button."
+            onRowClick={(project) => router.push(`/projects/${project.id}`)}
           />
         </div>
       )}

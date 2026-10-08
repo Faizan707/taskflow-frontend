@@ -11,7 +11,17 @@ import type {
   ProjectFormData,
   ProjectResponse,
 } from "../types/project";
-import type { UpdateRoleResponse, User } from "../types/user";
+import type { Assignee, UpdateRoleResponse, User } from "../types/user";
+import type {
+  KanbanStage,
+  KanbanStageFormData,
+  KanbanStageResponse,
+} from "../types/kanban";
+import type {
+  TaskFormData,
+  TaskResponse,
+  TaskUpdateData,
+} from "../types/task";
 
 export const api = createApi({
   reducerPath: "api",
@@ -29,7 +39,7 @@ export const api = createApi({
     },
   }),
 
-  tagTypes: ["Project", "User"],
+  tagTypes: ["Project", "User", "KanbanStage", "Task"],
 
   endpoints: (builder) => ({
     register: builder.mutation<RegisterResponse, RegisterForm>({
@@ -59,6 +69,10 @@ export const api = createApi({
             ]
           : [{ type: "User", id: "LIST" }],
     }),
+    getAssignees: builder.query<Assignee[], void>({
+      query: () => "/User/assignees",
+      providesTags: [{ type: "User", id: "ASSIGNEES" }],
+    }),
     updateUserRole: builder.mutation<
       UpdateRoleResponse,
       { userId: number; role: string }
@@ -73,7 +87,7 @@ export const api = createApi({
         { type: "User", id: "LIST" },
       ],
     }),
-    getProjects: builder.query<Project[], void>({
+    getProjects: builder.query<Project[], string>({
       query: () => "/Project",
       providesTags: (projects) =>
         projects
@@ -118,15 +132,95 @@ export const api = createApi({
         { type: "Project", id: "LIST" },
       ],
     }),
+    getProjectStages: builder.query<KanbanStage[], number>({
+      query: (projectId) => `/KanbanStage/project/${projectId}`,
+      providesTags: (_result, _error, projectId) => [
+        { type: "KanbanStage", id: projectId },
+        { type: "Task", id: `PROJECT-${projectId}` },
+      ],
+    }),
+    createKanbanStage: builder.mutation<
+      KanbanStageResponse,
+      KanbanStageFormData
+    >({
+      query: (stage) => ({
+        url: "/KanbanStage",
+        method: "POST",
+        body: stage,
+      }),
+      invalidatesTags: (_result, _error, { projectId }) => [
+        { type: "KanbanStage", id: projectId },
+      ],
+    }),
+    createTask: builder.mutation<TaskResponse, TaskFormData>({
+      query: (task) => ({
+        url: "/Task",
+        method: "POST",
+        body: task,
+      }),
+      invalidatesTags: (_result, _error, { projectId }) => [
+        { type: "KanbanStage", id: projectId },
+        { type: "Task", id: `PROJECT-${projectId}` },
+      ],
+    }),
+    updateTask: builder.mutation<
+      TaskResponse,
+      { taskId: number; projectId: number; task: TaskUpdateData }
+    >({
+      query: ({ taskId, task }) => ({
+        url: `/Task/${taskId}`,
+        method: "PUT",
+        body: task,
+      }),
+      invalidatesTags: (_result, _error, { projectId }) => [
+        { type: "KanbanStage", id: projectId },
+        { type: "Task", id: `PROJECT-${projectId}` },
+      ],
+    }),
+    moveTask: builder.mutation<
+      TaskResponse,
+      { taskId: number; projectId: number; stageId: number }
+    >({
+      query: ({ taskId, stageId }) => ({
+        url: `/Task/${taskId}/move`,
+        method: "PUT",
+        body: { stageId },
+      }),
+      invalidatesTags: (_result, _error, { projectId }) => [
+        { type: "KanbanStage", id: projectId },
+        { type: "Task", id: `PROJECT-${projectId}` },
+      ],
+    }),
+    deleteTask: builder.mutation<
+      { message: string },
+      { taskId: number; projectId: number }
+    >({
+      query: ({ taskId }) => ({
+        url: `/Task/${taskId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_result, _error, { projectId }) => [
+        { type: "KanbanStage", id: projectId },
+        { type: "Task", id: `PROJECT-${projectId}` },
+      ],
+    }),
   }),
 });
+
 export const {
   useRegisterMutation,
   useLoginMutation,
   useGetUsersQuery,
+  useGetAssigneesQuery,
   useUpdateUserRoleMutation,
   useGetProjectsQuery,
   useCreateProjectMutation,
   useUpdateProjectMutation,
   useDeleteProjectMutation,
+  useGetProjectStagesQuery,
+  useCreateKanbanStageMutation,
+  useCreateTaskMutation,
+  useUpdateTaskMutation,
+  useMoveTaskMutation,
+  useDeleteTaskMutation,
 } = api;

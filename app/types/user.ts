@@ -12,3 +12,9 @@ export interface UpdateRoleResponse {
   message: string;
   user: User;
 }
+
+export interface Assignee {
+  id: number;
+  name: string;
+  email: string;
+}
