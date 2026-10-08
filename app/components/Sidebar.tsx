@@ -75,7 +75,12 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               <Link
                 key={link.href}
                 href={link.href}
-                onClick={onClose}
+                onClick={() => {
+                  // Keep sidebar open on desktop; close only on small screens
+                  if (window.matchMedia("(max-width: 1023px)").matches) {
+                    onClose();
+                  }
+                }}
                 className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition
                   ${
                     active
