@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
+import { useNotificationHub } from "../hooks/useNotificationHub";
 import { getToken } from "../utils/storage";
+
+function NotificationHubListener() {
+  useNotificationHub();
+  return null;
+}
 
 export default function DashboardLayout({
   children,
@@ -30,6 +36,7 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background">
+      <NotificationHubListener />
       <Navbar />
 
       <main className="min-h-[calc(100vh-4rem)] lg:ml-64">{children}</main>

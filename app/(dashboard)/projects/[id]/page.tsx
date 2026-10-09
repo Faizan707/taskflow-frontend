@@ -13,10 +13,11 @@ import {
   useGetProjectStagesQuery,
   useGetProjectsQuery,
   useMoveTaskMutation,
+  useUpdateTaskMutation,
 } from "../../../services/api";
 import type { RootState } from "../../../store/store";
 import type { KanbanStage } from "../../../types/kanban";
-import type { Task, TaskPriority } from "../../../types/task";
+import type { Task, TaskPriority, TaskStatus } from "../../../types/task";
 import { TASK_PRIORITIES } from "../../../types/task";
 import { decodeToken } from "../../../utils/jwt";
 
@@ -49,17 +50,21 @@ export default function ProjectBoardPage() {
   });
 
   const [createTask, { isLoading: isCreatingTask }] = useCreateTaskMutation();
+  const [updateTask, { isLoading: isUpdatingTask }] = useUpdateTaskMutation();
   const [createStage, { isLoading: isCreatingStage }] =
     useCreateKanbanStageMutation();
   const [moveTask] = useMoveTaskMutation();
   const [deleteTask] = useDeleteTaskMutation();
 
   const [selectedStage, setSelectedStage] = useState<KanbanStage | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [taskForm, setTaskForm] = useState({
     title: "",
     description: "",
     priority: 2 as TaskPriority,
     assigneeId: currentUserId,
+    stageId: 0,
+    status: 1 as TaskStatus,
   });
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
   const [isStageModalOpen, setIsStageModalOpen] = useState(false);
@@ -67,12 +72,32 @@ export default function ProjectBoardPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   const openTaskDrawer = (stage: KanbanStage) => {
+    setEditingTask(null);
     setSelectedStage(stage);
     setTaskForm({
       title: "",
       description: "",
       priority: 2,
       assigneeId: currentUserId,
+      stageId: stage.id,
+      status: 1,
+    });
+    setMessage(null);
+    setIsTaskDrawerOpen(true);
+  };
+
+  const openEditTaskDrawer = (task: Task) => {
+    const stage =
+      stages.find((item) => item.id === task.stageId) ?? stages[0] ?? null;
+    setEditingTask(task);
+    setSelectedStage(stage);
+    setTaskForm({
+      title: task.title,
+      description: task.description ?? "",
+      priority: task.priority,
+      assigneeId: task.assigneeId,
+      stageId: task.stageId,
+      status: task.status,
     });
     setMessage(null);
     setIsTaskDrawerOpen(true);
@@ -81,33 +106,58 @@ export default function ProjectBoardPage() {
   const closeTaskDrawer = () => {
     setIsTaskDrawerOpen(false);
     setSelectedStage(null);
+    setEditingTask(null);
     setTaskForm({
       title: "",
       description: "",
       priority: 2,
       assigneeId: currentUserId,
+      stageId: 0,
+      status: 1,
     });
   };
 
-  const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSaveTask = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedStage) return;
+
+    const stageId = editingTask ? taskForm.stageId : selectedStage?.id;
+    if (!stageId) return;
 
     setMessage(null);
 
     try {
-      await createTask({
-        title: taskForm.title,
-        description: taskForm.description,
-        projectId,
-        stageId: selectedStage.id,
-        assigneeId: taskForm.assigneeId,
-        priority: taskForm.priority,
-      }).unwrap();
-      setMessage("Task created successfully.");
+      if (editingTask) {
+        await updateTask({
+          taskId: editingTask.id,
+          projectId,
+          task: {
+            title: taskForm.title,
+            description: taskForm.description,
+            stageId,
+            assigneeId: taskForm.assigneeId,
+            priority: taskForm.priority,
+            status: taskForm.status,
+          },
+        }).unwrap();
+        setMessage("Task updated successfully.");
+      } else {
+        await createTask({
+          title: taskForm.title,
+          description: taskForm.description,
+          projectId,
+          stageId,
+          assigneeId: taskForm.assigneeId,
+          priority: taskForm.priority,
+        }).unwrap();
+        setMessage("Task created successfully.");
+      }
       closeTaskDrawer();
     } catch {
-      setMessage("Could not create task. Please try again.");
+      setMessage(
+        editingTask
+          ? "Could not update task. Please try again."
+          : "Could not create task. Please try again."
+      );
     }
   };
 
@@ -209,13 +259,14 @@ export default function ProjectBoardPage() {
           <KanbanBoard
             stages={stages}
             onAddTask={openTaskDrawer}
+            onEditTask={openEditTaskDrawer}
             onDeleteTask={handleDeleteTask}
             onMoveTask={handleMoveTask}
           />
         </div>
       )}
 
-      {isTaskDrawerOpen && selectedStage && (
+      {isTaskDrawerOpen && (editingTask || selectedStage) && (
         <div className="fixed inset-0 z-[60]">
           <button
             type="button"
@@ -223,14 +274,16 @@ export default function ProjectBoardPage() {
             onClick={closeTaskDrawer}
             className="absolute inset-0 h-full w-full bg-black/40"
           />
-          <aside className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-(--card-background) p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-5">
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col overflow-hidden bg-(--card-background) shadow-2xl">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 px-6 pb-5 pt-6">
               <div>
                 <h2 className="text-xl font-bold text-(--text-primary)">
-                  Add Task
+                  {editingTask ? "Edit Task" : "Add Task"}
                 </h2>
                 <p className="mt-1 text-sm text-(--text-secondary)">
-                  Creating in stage: {selectedStage.name}
+                  {editingTask
+                    ? "Update details, stage, or assignee."
+                    : `Creating in stage: ${selectedStage?.name}`}
                 </p>
               </div>
               <button
@@ -243,103 +296,134 @@ export default function ProjectBoardPage() {
             </div>
 
             <form
-              onSubmit={handleCreateTask}
-              className="mt-6 flex flex-1 flex-col gap-5"
+              onSubmit={handleSaveTask}
+              className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="task-title"
-                  className="text-sm font-medium text-(--text-primary)"
-                >
-                  Title
-                </label>
-                <input
-                  id="task-title"
-                  required
-                  value={taskForm.title}
-                  onChange={(event) =>
-                    setTaskForm({ ...taskForm, title: event.target.value })
-                  }
-                  placeholder="e.g. Design login page"
-                  className="rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="task-description"
-                  className="text-sm font-medium text-(--text-primary)"
-                >
-                  Description
-                </label>
-                <textarea
-                  id="task-description"
-                  value={taskForm.description}
-                  onChange={(event) =>
-                    setTaskForm({
-                      ...taskForm,
-                      description: event.target.value,
-                    })
-                  }
-                  rows={4}
-                  placeholder="What needs to be done?"
-                  className="resize-none rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="task-assignee"
-                  className="text-sm font-medium text-(--text-primary)"
-                >
-                  Assignee
-                </label>
-                <select
-                  id="task-assignee"
-                  required
-                  value={taskForm.assigneeId || ""}
-                  onChange={(event) =>
-                    setTaskForm({
-                      ...taskForm,
-                      assigneeId: Number(event.target.value),
-                    })
-                  }
-                  className="rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20"
-                >
-                  <option value="" disabled>
-                    Select a user
-                  </option>
-                  {assignees.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name} ({user.email})
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="task-title"
+                    className="text-sm font-medium text-(--text-primary)"
+                  >
+                    Title
+                  </label>
+                  <input
+                    id="task-title"
+                    required
+                    value={taskForm.title}
+                    onChange={(event) =>
+                      setTaskForm({ ...taskForm, title: event.target.value })
+                    }
+                    placeholder="e.g. Design login page"
+                    className="rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="task-description"
+                    className="text-sm font-medium text-(--text-primary)"
+                  >
+                    Description
+                  </label>
+                  <textarea
+                    id="task-description"
+                    value={taskForm.description}
+                    onChange={(event) =>
+                      setTaskForm({
+                        ...taskForm,
+                        description: event.target.value,
+                      })
+                    }
+                    rows={4}
+                    placeholder="What needs to be done?"
+                    className="resize-none rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20"
+                  />
+                </div>
+                {editingTask && (
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="task-stage"
+                      className="text-sm font-medium text-(--text-primary)"
+                    >
+                      Stage
+                    </label>
+                    <select
+                      id="task-stage"
+                      required
+                      value={taskForm.stageId || ""}
+                      onChange={(event) =>
+                        setTaskForm({
+                          ...taskForm,
+                          stageId: Number(event.target.value),
+                        })
+                      }
+                      className="rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20"
+                    >
+                      {stages.map((stage) => (
+                        <option key={stage.id} value={stage.id}>
+                          {stage.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="task-assignee"
+                    className="text-sm font-medium text-(--text-primary)"
+                  >
+                    Assignee
+                  </label>
+                  <select
+                    id="task-assignee"
+                    required
+                    value={taskForm.assigneeId || ""}
+                    onChange={(event) =>
+                      setTaskForm({
+                        ...taskForm,
+                        assigneeId: Number(event.target.value),
+                      })
+                    }
+                    className="rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20"
+                  >
+                    <option value="" disabled>
+                      Select a user
                     </option>
-                  ))}
-                </select>
+                    {assignees.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="task-priority"
+                    className="text-sm font-medium text-(--text-primary)"
+                  >
+                    Priority
+                  </label>
+                  <select
+                    id="task-priority"
+                    value={taskForm.priority}
+                    onChange={(event) =>
+                      setTaskForm({
+                        ...taskForm,
+                        priority: Number(event.target.value) as TaskPriority,
+                      })
+                    }
+                    className="rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20"
+                  >
+                    {TASK_PRIORITIES.map((priority) => (
+                      <option key={priority.value} value={priority.value}>
+                        {priority.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="task-priority"
-                  className="text-sm font-medium text-(--text-primary)"
-                >
-                  Priority
-                </label>
-                <select
-                  id="task-priority"
-                  value={taskForm.priority}
-                  onChange={(event) =>
-                    setTaskForm({
-                      ...taskForm,
-                      priority: Number(event.target.value) as TaskPriority,
-                    })
-                  }
-                  className="rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20"
-                >
-                  {TASK_PRIORITIES.map((priority) => (
-                    <option key={priority.value} value={priority.value}>
-                      {priority.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="mt-auto flex justify-end gap-3 border-t border-gray-200 pt-5">
+
+              <div className="flex shrink-0 justify-end gap-3 border-t border-gray-200 bg-(--card-background) px-6 py-5">
                 <button
                   type="button"
                   onClick={closeTaskDrawer}
@@ -349,10 +433,16 @@ export default function ProjectBoardPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isCreatingTask}
+                  disabled={isCreatingTask || isUpdatingTask}
                   className="rounded-lg bg-(--primary) px-4 py-3 text-sm font-medium text-white transition hover:bg-(--primary-dark) disabled:opacity-60"
                 >
-                  {isCreatingTask ? "Creating..." : "Create Task"}
+                  {editingTask
+                    ? isUpdatingTask
+                      ? "Saving..."
+                      : "Save Changes"
+                    : isCreatingTask
+                      ? "Creating..."
+                      : "Create Task"}
                 </button>
               </div>
             </form>

@@ -30,6 +30,7 @@ export interface TaskUpdateData {
   title: string;
   description: string;
   stageId: number;
+  assigneeId: number;
   priority: TaskPriority;
   status: TaskStatus;
 }

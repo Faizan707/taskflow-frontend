@@ -9,6 +9,7 @@ import { decodeToken } from "../utils/jwt";
 import { removeToken } from "../utils/storage";
 import { RxHamburgerMenu } from "react-icons/rx";
 import { FiLogOut } from "react-icons/fi";
+import NotificationBell from "./NotificationBell";
 import Sidebar from "./Sidebar";
 
 const Navbar = () => {
@@ -53,6 +54,8 @@ const Navbar = () => {
           {/* User */}
           {user && (
             <div className="flex items-center gap-3">
+              <NotificationBell />
+
               <div className="hidden text-right sm:block">
                 <p className="text-xs text-(--text-secondary)">Welcome back</p>
 

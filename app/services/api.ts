@@ -18,11 +18,16 @@ import type {
   KanbanStageResponse,
 } from "../types/kanban";
 import type {
+  Task,
   TaskFormData,
   TaskResponse,
   TaskUpdateData,
 } from "../types/task";
 import type { DashboardSummary } from "../types/dashboard";
+import type {
+  NotificationItem,
+  UnreadCountResponse,
+} from "../types/notification";
 
 export const api = createApi({
   reducerPath: "api",
@@ -40,7 +45,14 @@ export const api = createApi({
     },
   }),
 
-  tagTypes: ["Project", "User", "KanbanStage", "Task", "Dashboard"],
+  tagTypes: [
+    "Project",
+    "User",
+    "KanbanStage",
+    "Task",
+    "Dashboard",
+    "Notification",
+  ],
 
   endpoints: (builder) => ({
     register: builder.mutation<RegisterResponse, RegisterForm>({
@@ -60,6 +72,37 @@ export const api = createApi({
     getDashboard: builder.query<DashboardSummary, void>({
       query: () => "/Dashboard",
       providesTags: [{ type: "Dashboard", id: "SUMMARY" }],
+    }),
+    getNotifications: builder.query<NotificationItem[], void>({
+      query: () => "/Notification",
+      providesTags: [{ type: "Notification", id: "LIST" }],
+    }),
+    getUnreadNotificationCount: builder.query<UnreadCountResponse, void>({
+      query: () => "/Notification/unread-count",
+      providesTags: [{ type: "Notification", id: "UNREAD" }],
+    }),
+    markNotificationRead: builder.mutation<{ message: string }, number>({
+      query: (id) => ({
+        url: `/Notification/${id}/read`,
+        method: "PUT",
+      }),
+      invalidatesTags: [
+        { type: "Notification", id: "LIST" },
+        { type: "Notification", id: "UNREAD" },
+      ],
+    }),
+    markAllNotificationsRead: builder.mutation<
+      { message: string; count: number },
+      void
+    >({
+      query: () => ({
+        url: "/Notification/read-all",
+        method: "PUT",
+      }),
+      invalidatesTags: [
+        { type: "Notification", id: "LIST" },
+        { type: "Notification", id: "UNREAD" },
+      ],
     }),
     getUsers: builder.query<User[], void>({
       query: () => "/User",
@@ -162,6 +205,19 @@ export const api = createApi({
         { type: "KanbanStage", id: projectId },
       ],
     }),
+    getTasks: builder.query<Task[], void>({
+      query: () => "/Task",
+      providesTags: (tasks) =>
+        tasks
+          ? [
+              ...tasks.map((task) => ({
+                type: "Task" as const,
+                id: task.id,
+              })),
+              { type: "Task", id: "LIST" },
+            ]
+          : [{ type: "Task", id: "LIST" }],
+    }),
     createTask: builder.mutation<TaskResponse, TaskFormData>({
       query: (task) => ({
         url: "/Task",
@@ -171,7 +227,10 @@ export const api = createApi({
       invalidatesTags: (_result, _error, { projectId }) => [
         { type: "KanbanStage", id: projectId },
         { type: "Task", id: `PROJECT-${projectId}` },
+        { type: "Task", id: "LIST" },
         { type: "Dashboard", id: "SUMMARY" },
+        { type: "Notification", id: "LIST" },
+        { type: "Notification", id: "UNREAD" },
       ],
     }),
     updateTask: builder.mutation<
@@ -183,10 +242,14 @@ export const api = createApi({
         method: "PUT",
         body: task,
       }),
-      invalidatesTags: (_result, _error, { projectId }) => [
+      invalidatesTags: (_result, _error, { projectId, taskId }) => [
         { type: "KanbanStage", id: projectId },
         { type: "Task", id: `PROJECT-${projectId}` },
+        { type: "Task", id: taskId },
+        { type: "Task", id: "LIST" },
         { type: "Dashboard", id: "SUMMARY" },
+        { type: "Notification", id: "LIST" },
+        { type: "Notification", id: "UNREAD" },
       ],
     }),
     moveTask: builder.mutation<
@@ -198,9 +261,11 @@ export const api = createApi({
         method: "PUT",
         body: { stageId },
       }),
-      invalidatesTags: (_result, _error, { projectId }) => [
+      invalidatesTags: (_result, _error, { projectId, taskId }) => [
         { type: "KanbanStage", id: projectId },
         { type: "Task", id: `PROJECT-${projectId}` },
+        { type: "Task", id: taskId },
+        { type: "Task", id: "LIST" },
         { type: "Dashboard", id: "SUMMARY" },
       ],
     }),
@@ -212,9 +277,11 @@ export const api = createApi({
         url: `/Task/${taskId}`,
         method: "DELETE",
       }),
-      invalidatesTags: (_result, _error, { projectId }) => [
+      invalidatesTags: (_result, _error, { projectId, taskId }) => [
         { type: "KanbanStage", id: projectId },
         { type: "Task", id: `PROJECT-${projectId}` },
+        { type: "Task", id: taskId },
+        { type: "Task", id: "LIST" },
         { type: "Dashboard", id: "SUMMARY" },
       ],
     }),
@@ -225,6 +292,10 @@ export const {
   useRegisterMutation,
   useLoginMutation,
   useGetDashboardQuery,
+  useGetNotificationsQuery,
+  useGetUnreadNotificationCountQuery,
+  useMarkNotificationReadMutation,
+  useMarkAllNotificationsReadMutation,
   useGetUsersQuery,
   useGetAssigneesQuery,
   useUpdateUserRoleMutation,
@@ -234,6 +305,7 @@ export const {
   useDeleteProjectMutation,
   useGetProjectStagesQuery,
   useCreateKanbanStageMutation,
+  useGetTasksQuery,
   useCreateTaskMutation,
   useUpdateTaskMutation,
   useMoveTaskMutation,

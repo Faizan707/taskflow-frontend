@@ -8,6 +8,7 @@ import { TASK_PRIORITIES } from "../types/task";
 interface KanbanBoardProps {
   stages: KanbanStage[];
   onAddTask: (stage: KanbanStage) => void;
+  onEditTask: (task: Task) => void;
   onDeleteTask: (task: Task) => void;
   onMoveTask: (task: Task, stageId: number) => void;
 }
@@ -26,6 +27,7 @@ function priorityClass(priority: number) {
 export default function KanbanBoard({
   stages,
   onAddTask,
+  onEditTask,
   onDeleteTask,
   onMoveTask,
 }: KanbanBoardProps) {
@@ -121,13 +123,28 @@ export default function KanbanBoard({
                     <h3 className="text-sm font-semibold text-(--text-primary)">
                       {task.title}
                     </h3>
-                    <button
-                      type="button"
-                      onClick={() => onDeleteTask(task)}
-                      className="text-xs font-medium text-red-600 hover:underline"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEditTask(task);
+                        }}
+                        className="text-xs font-medium text-(--primary) hover:underline"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDeleteTask(task);
+                        }}
+                        className="text-xs font-medium text-red-600 hover:underline"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                   {task.description && (
                     <p className="mt-2 line-clamp-3 text-xs text-(--text-secondary)">

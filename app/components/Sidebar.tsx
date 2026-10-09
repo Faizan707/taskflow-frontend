@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSelector } from "react-redux";
-import { MdDashboard, MdFolder, MdClose, MdPeople } from "react-icons/md";
+import {
+  MdDashboard,
+  MdFolder,
+  MdClose,
+  MdPeople,
+  MdAssignment,
+} from "react-icons/md";
 import type { RootState } from "../store/store";
 import { decodeToken } from "../utils/jwt";
 
@@ -27,6 +33,11 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       name: "Projects",
       href: "/projects",
       icon: MdFolder,
+    },
+    {
+      name: "Tasks",
+      href: "/tasks",
+      icon: MdAssignment,
     },
     ...(role === "Admin"
       ? [
@@ -69,7 +80,11 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         <nav className="flex flex-col gap-2 p-4">
           {links.map((link) => {
             const Icon = link.icon;
-            const active = pathname === link.href;
+            const active =
+              link.href === "/"
+                ? pathname === "/"
+                : pathname === link.href || pathname.startsWith(`${link.href}/`);
+
 
             return (
               <Link
