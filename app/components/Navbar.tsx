@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../store/store";
 import { logout } from "../store/authSlice";
 import { decodeToken } from "../utils/jwt";
-import { removeToken } from "../utils/storage";
+import { forceLogoutToLogin } from "../utils/session";
 import { RxHamburgerMenu } from "react-icons/rx";
 import { FiLogOut } from "react-icons/fi";
 import NotificationBell from "./NotificationBell";
@@ -15,15 +14,13 @@ import Sidebar from "./Sidebar";
 const Navbar = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const dispatch = useDispatch();
-  const router = useRouter();
 
   const token = useSelector((state: RootState) => state.auth.token);
   const user = token ? decodeToken(token) : null;
 
   const handleLogout = () => {
-    removeToken();
     dispatch(logout());
-    router.replace("/login");
+    forceLogoutToLogin();
   };
 
   return (

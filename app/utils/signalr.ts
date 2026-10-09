@@ -70,18 +70,29 @@ async function ensureStarted(token: string) {
     .then(() => undefined)
     .catch((error) => {
       const message = String(error?.message ?? error).toLowerCase();
+      const authFailed =
+        message.includes("401") ||
+        message.includes("unauthorized") ||
+        message.includes("status code '401'");
       const benign =
         message.includes("stopped during negotiation") ||
         message.includes("connection was stopped") ||
         message.includes("abort");
 
-      if (!benign) {
-        console.warn("SignalR connection failed:", error);
-      }
-
       if (sharedConnection === connection) {
         sharedConnection = null;
         startPromise = null;
+      }
+
+      if (authFailed) {
+        void import("./session").then(({ forceLogoutToLogin }) => {
+          forceLogoutToLogin();
+        });
+        return;
+      }
+
+      if (!benign) {
+        console.warn("SignalR connection failed:", error);
       }
     });
 
@@ -98,4 +109,21 @@ export async function subscribeNotifications(
   return () => {
     handlers.delete(handler);
   };
+}
+
+export async function stopNotificationHub() {
+  handlers.clear();
+  startPromise = null;
+  sharedToken = null;
+
+  if (!sharedConnection) return;
+
+  const connection = sharedConnection;
+  sharedConnection = null;
+
+  try {
+    await connection.stop();
+  } catch {
+    // ignore
+  }
 }

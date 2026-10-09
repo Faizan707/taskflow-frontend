@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useDispatch } from "react-redux";
 import Navbar from "../components/Navbar";
 import { useNotificationHub } from "../hooks/useNotificationHub";
+import { logout } from "../store/authSlice";
+import { isTokenExpired } from "../utils/jwt";
+import { forceLogoutToLogin } from "../utils/session";
 import { getToken } from "../utils/storage";
 
 function NotificationHubListener() {
@@ -16,19 +19,20 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
+  const dispatch = useDispatch();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const token = getToken();
 
-    if (!token) {
-      router.replace("/login");
+    if (!token || isTokenExpired(token)) {
+      dispatch(logout());
+      forceLogoutToLogin();
       return;
     }
 
     setReady(true);
-  }, [router]);
+  }, [dispatch]);
 
   if (!ready) {
     return null;

@@ -1,10 +1,17 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import {
+  BaseQueryFn,
+  createApi,
+  FetchArgs,
+  fetchBaseQuery,
+  FetchBaseQueryError,
+} from "@reduxjs/toolkit/query/react";
 import {
   LoginForm,
   LoginResponse,
   RegisterForm,
   RegisterResponse,
 } from "../types/auth";
+import { logout } from "../store/authSlice";
 import type { RootState } from "../store/store";
 import type {
   Project,
@@ -28,22 +35,66 @@ import type {
   NotificationItem,
   UnreadCountResponse,
 } from "../types/notification";
+import { isTokenExpired } from "../utils/jwt";
+import { forceLogoutToLogin } from "../utils/session";
+
+const rawBaseQuery = fetchBaseQuery({
+  baseUrl: process.env.NEXT_PUBLIC_API_URL,
+  prepareHeaders: (headers, { getState }) => {
+    const token = (getState() as RootState).auth.token;
+
+    if (token) {
+      headers.set("authorization", `Bearer ${token}`);
+    }
+
+    return headers;
+  },
+});
+
+function getRequestUrl(args: string | FetchArgs) {
+  return typeof args === "string" ? args : args.url;
+}
+
+function isPublicAuthUrl(url: string) {
+  return url === "/User/login" || url === "/User/register";
+}
+
+const baseQueryWithAuth: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, baseQueryApi, extraOptions) => {
+  const url = getRequestUrl(args);
+  const token = (baseQueryApi.getState() as RootState).auth.token;
+
+  if (token && isTokenExpired(token) && !isPublicAuthUrl(url)) {
+    baseQueryApi.dispatch(logout());
+    baseQueryApi.dispatch(api.util.resetApiState());
+    forceLogoutToLogin();
+    return {
+      error: {
+        status: 401,
+        data: { message: "Session expired" },
+      },
+    };
+  }
+
+  const result = await rawBaseQuery(args, baseQueryApi, extraOptions);
+
+  // 401 = missing/invalid/expired JWT. Do not treat 403 (role forbid) as logout.
+  if (result.error && result.error.status === 401 && !isPublicAuthUrl(url)) {
+    baseQueryApi.dispatch(logout());
+    baseQueryApi.dispatch(api.util.resetApiState());
+    forceLogoutToLogin();
+  }
+
+  return result;
+};
 
 export const api = createApi({
   reducerPath: "api",
 
-  baseQuery: fetchBaseQuery({
-    baseUrl: process.env.NEXT_PUBLIC_API_URL,
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.token;
-
-      if (token) {
-        headers.set("authorization", `Bearer ${token}`);
-      }
-
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithAuth,
 
   tagTypes: [
     "Project",
